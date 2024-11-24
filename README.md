@@ -15,5 +15,5 @@ Hivemind is a powerful Discord bot designed for remote server management and mon
 
 1. Clone the repository:
   ```bash
-      git clone https://github.com/yourusername/hivemind.git
+      git clone https://github.com/xxlyitemxx/hivemind.git
   ```
