@@ -1,0 +1,11 @@
+# Discord API
+nextcord>=2.0.0
+
+# System Information
+psutil>=5.9.0
+
+# Security
+bcrypt>=4.0.1
+
+# Environment Variables
+python-dotenv>=1.0.0
