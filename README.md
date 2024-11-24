@@ -53,28 +53,6 @@ Hivemind is a powerful Discord bot designed for remote server management and mon
 - Role-based command access
 - Comprehensive action logging
 
-## Development
-
-The project structure is organized as follows:
-  hivemind/
-  ├── src/
-  │ ├── main.py
-  │ ├── command/
-  │ │ ├── ls.py
-  │ │ ├── pull.py
-  │ │ ├── system_info.py
-  │ │ ├── terminal.py
-  │ │ ├── register.py
-  │ │ └── logs.py
-  │ └── assets/
-  │ └── utils/
-  │ ├── config_loader.py
-  │ ├── credential_manager.py
-  │ ├── session_manager.py
-  │ └── logger.py
-  ├── config.json
-  └── credentials.json
-
 ## Contributing
 
 1. Fork the repository
