@@ -1,1 +1,7 @@
 
+  {
+   "token": "YOUR_DISCORD_BOT_TOKEN",
+   "owner_id": "YOUR_DISCORD_USER_ID",
+   "registration_key": "YOUR_REGISTRATION_KEY",
+   "log_key": "YOUR_LOG_ACCESS_KEY"
+   }
