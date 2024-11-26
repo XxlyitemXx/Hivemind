@@ -26,8 +26,7 @@ class LoginModal(Modal):
         self.password = TextInput(
             label="Password",
             placeholder="Enter password",
-            required=True,
-            style=TextInputStyle.paragraph
+            required=True
         )
         self.add_item(self.username)
         self.add_item(self.password)
@@ -46,11 +45,15 @@ class TerminalView(View):
     def __init__(self, user_id):
         super().__init__(timeout=None)
         self.user_id = user_id
+        self.last_message = None 
+        self.bot_messages = []
 
     @nextcord.ui.button(label="Enter Command", style=ButtonStyle.primary)
     async def command_button(self, button: Button, interaction: Interaction):
         if not session_manager.has_active_session(self.user_id):
-            await interaction.response.send_message("No active session. Please login first.", ephemeral=True)
+            if self.last_message:
+                await self.last_message.delete()
+            self.last_message = await interaction.response.send_message("No active session. Please login first.")
             return
 
         modal = CommandModal()
@@ -66,16 +69,22 @@ class TerminalView(View):
                     venv_args = command[5:].strip()
                     if venv_args == "deactivate":
                         session_manager.deactivate_venv(self.user_id)
-                        await interaction.response.send_message("Virtual environment deactivated", ephemeral=True)
+                        if self.last_message:
+                            await self.last_message.delete()
+                        self.last_message = await interaction.response.send_message("Virtual environment deactivated")
                         return
                     elif venv_args.startswith("activate "):
                         venv_path = os.path.join(current_dir, venv_args[9:].strip())
                         if os.path.exists(os.path.join(venv_path, "bin", "activate")):
                             session_manager.activate_venv(self.user_id, venv_path)
-                            await interaction.response.send_message(f"Activated virtual environment at {venv_path}", ephemeral=True)
+                            if self.last_message:
+                                await self.last_message.delete()
+                            self.last_message = await interaction.response.send_message(f"Activated virtual environment at {venv_path}")
                             return
                         else:
-                            await interaction.response.send_message("Invalid virtual environment path", ephemeral=True)
+                            if self.last_message:
+                                await self.last_message.delete()
+                            self.last_message = await interaction.response.send_message("Invalid virtual environment path")
                             return
                 if not os.path.isabs(current_dir):
                     current_dir = os.path.abspath(current_dir)
@@ -132,7 +141,9 @@ class TerminalView(View):
                             if os.path.exists(new_abs_path):
                                 session_manager.set_current_dir(self.user_id, new_abs_path)
                     except Exception as e:
-                        await interaction.response.send_message(f"Error changing directory: {str(e)}", ephemeral=True)
+                        if self.last_message:
+                            await self.last_message.delete()
+                        self.last_message = await interaction.response.send_message(f"Error changing directory: {str(e)}")
                         return
 
                 result = stdout if stdout else stderr
@@ -146,10 +157,15 @@ class TerminalView(View):
                 )
                 embed.add_field(name="Working Directory", value=current_dir)
                 logger.command(self.user_id, command, "completed")
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                if self.last_message:
+                    await self.last_message.delete()
+                self.last_message = await interaction.response.send_message(embed=embed)
+                self.bot_messages.append(self.last_message)
 
             except Exception as e:
-                await interaction.response.send_message(f"Error executing command: {str(e)}", ephemeral=True)
+                if self.last_message:
+                    await self.last_message.delete()
+                self.last_message = await interaction.response.send_message(f"Error executing command: {str(e)}")
                 logger.error(f"Command execution failed: {str(e)}", "TERMINAL")
 
         modal.callback = modal_callback
@@ -158,6 +174,12 @@ class TerminalView(View):
     @nextcord.ui.button(label="Close Connection", style=ButtonStyle.danger)
     async def close_button(self, button: Button, interaction: Interaction):
         session_manager.end_session(self.user_id)
+        for message in self.bot_messages:
+            try:
+                await message.delete()
+            except:
+                pass
+        
         await interaction.message.delete()
 
 class Terminal(commands.Cog):
