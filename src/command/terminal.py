@@ -8,6 +8,7 @@ from assets.utils.config_loader import load_config
 from assets.utils.session_manager import SessionManager
 from assets.utils.credential_manager import CredentialManager
 from assets.utils.logger import Logger
+import platform
 
 config = load_config()
 session_manager = SessionManager()
@@ -61,22 +62,67 @@ class TerminalView(View):
             logger.command(self.user_id, command, "attempting")
             
             try:
-                # Make sure current_dir exists and is absolute
+                if command.startswith('venv '):
+                    venv_args = command[5:].strip()
+                    if venv_args == "deactivate":
+                        session_manager.deactivate_venv(self.user_id)
+                        await interaction.response.send_message("Virtual environment deactivated", ephemeral=True)
+                        return
+                    elif venv_args.startswith("activate "):
+                        venv_path = os.path.join(current_dir, venv_args[9:].strip())
+                        if os.path.exists(os.path.join(venv_path, "bin", "activate")):
+                            session_manager.activate_venv(self.user_id, venv_path)
+                            await interaction.response.send_message(f"Activated virtual environment at {venv_path}", ephemeral=True)
+                            return
+                        else:
+                            await interaction.response.send_message("Invalid virtual environment path", ephemeral=True)
+                            return
                 if not os.path.isabs(current_dir):
                     current_dir = os.path.abspath(current_dir)
                 
-                process = subprocess.Popen(
-                    command,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    cwd=current_dir
-                )
+                env = os.environ.copy()
+                if session_manager.is_venv_active(self.user_id):
+                    venv_path = session_manager.is_venv_active(self.user_id)
+                    if platform.system() == "Windows":
+                        python_path = os.path.join(venv_path, "Scripts", "python.exe")
+                        env["PATH"] = os.path.join(venv_path, "Scripts") + os.pathsep + env["PATH"]
+                    else:
+                        python_path = os.path.join(venv_path, "bin", "python")
+                        env["PATH"] = os.path.join(venv_path, "bin") + os.pathsep + env["PATH"]
+                    env["VIRTUAL_ENV"] = venv_path
+                    if command.startswith('python '):
+                        command = f"{python_path} {command[7:]}"
+
+                system = platform.system()
+                if system == "Windows":
+                    process = subprocess.Popen(
+                        command,
+                        shell=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        cwd=current_dir,
+                        env=env,
+                        universal_newlines=True
+                    )
+                else:
+                    process = subprocess.Popen(
+                        command,
+                        shell=True,
+                        executable='/bin/bash',
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        cwd=current_dir,
+                        env=env,
+                        universal_newlines=True
+                    )
+                
                 stdout, stderr = process.communicate()
                 
-                # Update current directory if cd command
                 if command.startswith('cd '):
                     new_dir = command[3:].strip()
+                    if new_dir == "~" or new_dir.startswith("~/"):
+                        new_dir = os.path.expanduser(new_dir)
+                    
                     try:
                         if os.path.isabs(new_dir):
                             if os.path.exists(new_dir):
@@ -89,7 +135,7 @@ class TerminalView(View):
                         await interaction.response.send_message(f"Error changing directory: {str(e)}", ephemeral=True)
                         return
 
-                result = stdout.decode('utf-8') if stdout else stderr.decode('utf-8')
+                result = stdout if stdout else stderr
                 if len(result) > 2000:
                     result = result[:1997] + "..."
 
@@ -124,7 +170,6 @@ class Terminal(commands.Cog):
             await ctx.send("You are not authorized to use this command.")
             return
 
-        # Create a view with a button to show the login modal
         view = View()
         button = Button(label="Login", style=ButtonStyle.primary)
 
